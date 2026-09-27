@@ -21,8 +21,8 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("face-service")
 
 app = FastAPI(title="Velox Ledger Face Service")
-MODEL_NAME = "ArcFace"
-DETECTOR_BACKEND = "mtcnn"
+MODEL_NAME = "Facenet"
+DETECTOR_BACKEND = "mediapipe"
 ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
 MAX_IMAGE_SIZE = 10 * 1024 * 1024
 DeepFace = None
