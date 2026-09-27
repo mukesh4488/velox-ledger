@@ -3,4 +3,3 @@ uvicorn
 python-multipart
 deepface[tensorflow]
 tf-keras
-opencv-python-headless<5.0
