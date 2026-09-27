@@ -76,7 +76,7 @@ async def extract_embedding(file: UploadFile = File(...)):
             detected = DeepFace.extract_faces(img_path=tmp_path, detector_backend=DETECTOR_BACKEND, enforce_detection=False, align=True)
         except Exception as exc:
             logger.exception("Face detection failed: %s", exc)
-            return JSONResponse(status_code=422, content={"success": False, "message": "Failed to process the image for face detection."})
+            return JSONResponse(status_code=422, content={"success": False, "message": f"Failed to process the image for face detection. Python Error: {str(exc)}"})
         real = [f for f in detected if float(f.get("confidence", 0) or 0) > 0]
         if len(real) == 0: return {"success": False, "faceCount": 0, "message": "No face detected."}
         if len(real) > 1: return {"success": False, "faceCount": len(real), "message": "Multiple faces detected. Please ensure only one person is visible."}
@@ -113,7 +113,7 @@ async def extract_embeddings(file: UploadFile = File(...)):
             detected = DeepFace.extract_faces(img_path=tmp_path, detector_backend=DETECTOR_BACKEND, enforce_detection=False, align=True)
         except Exception as exc:
             logger.exception("Multi-face detection failed: %s", exc)
-            return JSONResponse(status_code=422, content={"success": False, "message": "Failed to process the image for face detection."})
+            return JSONResponse(status_code=422, content={"success": False, "message": f"Failed to process the image for face detection. Python Error: {str(exc)}"})
         real_faces = [f for f in detected if float(f.get("confidence", 0) or 0) > 0]
         if not real_faces: return {"success": True, "faceCount": 0, "faces": []}
 
