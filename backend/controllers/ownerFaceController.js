@@ -3,12 +3,12 @@ const Transaction = require('../models/Transaction');
 const { findBestMatch, cosineSimilarity } = require('../utils/faceUtil');
 
 const FACE_SERVICE_URL = process.env.FACE_SERVICE_URL || 'http://127.0.0.1:5001';
-const FACE_RECOGNITION_THRESHOLD = parseFloat(process.env.FACE_RECOGNITION_THRESHOLD || '0.6');
+const FACE_RECOGNITION_THRESHOLD = parseFloat(process.env.FACE_RECOGNITION_THRESHOLD || '0.93');
 
 const axios = require('axios');
 const FormData = require('form-data');
 
-async function callPythonFaceService(buffer, originalname, mimetype, endpoint = '/extract-embedding', timeoutMs = 15000) {
+async function callPythonFaceService(buffer, originalname, mimetype, endpoint = '/extract-embedding', timeoutMs = 60000) {
   try {
     const formData = new FormData();
     formData.append('file', buffer, { filename: originalname || 'face.jpg', contentType: mimetype || 'image/jpeg' });
