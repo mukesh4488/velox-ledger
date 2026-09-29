@@ -1,39 +1,59 @@
 import os
-import sys
 import logging
+import io
 from fastapi import FastAPI, UploadFile, File
 from fastapi.responses import JSONResponse
-import face_recognition
+from PIL import Image
+import torch
+from facenet_pytorch import MTCNN, InceptionResnetV1
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("face-service")
 
 app = FastAPI(title="Velox Ledger Face Service")
-ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
+
+# Initialize models globally on CPU
+mtcnn = None
+resnet = None
+models_ready = False
+
+def init_models():
+    global mtcnn, resnet, models_ready
+    try:
+        # keep_all=True for multi-face, but we handle single-face logic below
+        mtcnn = MTCNN(keep_all=True, device='cpu')
+        resnet = InceptionResnetV1(pretrained='vggface2').eval().to('cpu')
+        models_ready = True
+        logger.info("PyTorch FaceNet models loaded successfully.")
+    except Exception as exc:
+        logger.exception("Failed to load PyTorch models: %s", exc)
+
+init_models()
 
 @app.get("/health")
 async def health():
-    return {"success": True, "message": "Lightweight face service is running"}
+    return {"success": True, "message": "PyTorch face service is running"}
 
 @app.post("/extract-embedding")
 async def extract_embedding(file: UploadFile = File(...)):
+    if not models_ready: return JSONResponse(status_code=503, content={"success": False, "message": "Models loading..."})
     try:
         contents = await file.read()
-        # face_recognition requires a numpy array, but we can load from bytes easily using face_recognition.load_image_file
-        # load_image_file accepts a file-like object, so we wrap bytes in io.BytesIO
-        import io
-        image_stream = io.BytesIO(contents)
-        image = face_recognition.load_image_file(image_stream)
+        image = Image.open(io.BytesIO(contents)).convert('RGB')
         
-        # Get face encodings (128-dimensional)
-        encodings = face_recognition.face_encodings(image)
-        
-        if len(encodings) == 0:
+        # MTCNN returns a tensor of cropped faces [N, C, H, W]
+        faces = mtcnn(image)
+        if faces is None or len(faces) == 0:
             return {"success": False, "faceCount": 0, "message": "No face detected."}
-        if len(encodings) > 1:
-            return {"success": False, "faceCount": len(encodings), "message": "Multiple faces detected. Please ensure only one person is visible."}
+        if len(faces) > 1:
+            return {"success": False, "faceCount": len(faces), "message": "Multiple faces detected. Please ensure only one person is visible."}
+        
+        with torch.no_grad():
+            # Pass the single cropped face through ResNet
+            # faces[0] shape is [3, 160, 160]. We unsqueeze to [1, 3, 160, 160]
+            emb = resnet(faces[0].unsqueeze(0))
+            embedding = emb.squeeze(0).tolist()
             
-        embedding = encodings[0].tolist()
         return {"success": True, "faceCount": 1, "embeddingDimension": len(embedding), "embedding": embedding}
     except Exception as exc:
         logger.exception("Extraction failed: %s", exc)
@@ -41,23 +61,27 @@ async def extract_embedding(file: UploadFile = File(...)):
 
 @app.post("/extract-embeddings")
 async def extract_embeddings(file: UploadFile = File(...)):
+    if not models_ready: return JSONResponse(status_code=503, content={"success": False, "message": "Models loading..."})
     try:
         contents = await file.read()
-        import io
-        image_stream = io.BytesIO(contents)
-        image = face_recognition.load_image_file(image_stream)
+        image = Image.open(io.BytesIO(contents)).convert('RGB')
         
-        # Find all face locations and encodings
-        face_locations = face_recognition.face_locations(image)
-        encodings = face_recognition.face_encodings(image, known_face_locations=face_locations)
+        # detect() returns bounding boxes
+        boxes, _ = mtcnn.detect(image)
+        faces = mtcnn(image)
         
+        if faces is None or boxes is None or len(faces) == 0:
+            return {"success": True, "faceCount": 0, "faces": []}
+            
+        with torch.no_grad():
+            embeddings = resnet(faces)
+            
         output = []
-        for i in range(len(encodings)):
-            top, right, bottom, left = face_locations[i]
-            embedding = encodings[i].tolist()
+        for i in range(len(embeddings)):
+            box = boxes[i].tolist()
             output.append({
-                "embedding": embedding,
-                "facialArea": {"x": left, "y": top, "w": right - left, "h": bottom - top},
+                "embedding": embeddings[i].tolist(),
+                "facialArea": {"x": int(box[0]), "y": int(box[1]), "w": int(box[2] - box[0]), "h": int(box[3] - box[1])},
                 "faceConfidence": 1.0
             })
             

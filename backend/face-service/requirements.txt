@@ -1,5 +1,6 @@
 fastapi
 uvicorn
 python-multipart
-face_recognition
+facenet-pytorch
+Pillow
 numpy
