@@ -3,7 +3,7 @@ const Transaction = require('../models/Transaction');
 const { findBestMatch, cosineSimilarity } = require('../utils/faceUtil');
 
 const FACE_SERVICE_URL = process.env.FACE_SERVICE_URL || 'http://127.0.0.1:5001';
-const FACE_RECOGNITION_THRESHOLD = parseFloat(process.env.FACE_RECOGNITION_THRESHOLD || '0.7');
+const FACE_RECOGNITION_THRESHOLD = parseFloat(process.env.FACE_RECOGNITION_THRESHOLD || '0.85');
 
 const axios = require('axios');
 const FormData = require('form-data');
