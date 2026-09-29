@@ -3,7 +3,7 @@ const Transaction = require('../models/Transaction');
 const { findBestMatch, cosineSimilarity } = require('../utils/faceUtil');
 
 const FACE_SERVICE_URL = process.env.FACE_SERVICE_URL || 'http://127.0.0.1:5001';
-const FACE_RECOGNITION_THRESHOLD = parseFloat(process.env.FACE_RECOGNITION_THRESHOLD || '0.6');
+const FACE_RECOGNITION_THRESHOLD = parseFloat(process.env.FACE_RECOGNITION_THRESHOLD || '0.5');
 
 const axios = require('axios');
 const FormData = require('form-data');
@@ -73,7 +73,7 @@ exports.scanFaces = async (req, res, next) => {
   try {
     if (!req.file) return res.status(400).json({ success: false, message: 'No image provided.' });
     let pythonRes;
-    try { pythonRes = await callPythonFaceService(req.file.buffer, req.file.originalname, req.file.mimetype, '/extract-embeddings', 25000); }
+    try { pythonRes = await callPythonFaceService(req.file.buffer, req.file.originalname, req.file.mimetype, '/extract-embeddings', 60000); }
     catch (e) { return res.status(503).json({ success: false, message: e.message }); }
 
     if (!pythonRes.success && Number(pythonRes.faceCount || 0) === 0) return res.json({ success: true, faceCount: 0, faces: [] });
