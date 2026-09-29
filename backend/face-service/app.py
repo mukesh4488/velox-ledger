@@ -68,10 +68,17 @@ async def extract_embeddings(file: UploadFile = File(...)):
         image = Image.open(io.BytesIO(contents)).convert('RGB')
         
         # detect() returns bounding boxes (Runs CNN)
-        boxes, probs = mtcnn.detect(image)
+        raw_boxes, probs = mtcnn.detect(image)
         
-        if boxes is None or len(boxes) == 0:
+        if raw_boxes is None or len(raw_boxes) == 0:
             return {"success": True, "faceCount": 0, "faces": []}
+            
+        # Filter out false positives (e.g. blank walls) by requiring 95% confidence
+        valid_indices = [i for i, p in enumerate(probs) if p is not None and p > 0.95]
+        if not valid_indices:
+            return {"success": True, "faceCount": 0, "faces": []}
+            
+        boxes = raw_boxes[valid_indices]
             
         # extract() crops the image using the boxes (NO CNN, instant)
         faces = mtcnn.extract(image, boxes, save_path=None)
