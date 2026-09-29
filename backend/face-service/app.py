@@ -21,7 +21,8 @@ def init_models():
     global mtcnn, resnet, models_ready
     try:
         # keep_all=True for multi-face, but we handle single-face logic below
-        mtcnn = MTCNN(keep_all=True, device='cpu')
+        # min_face_size=60 drastically reduces computation time by skipping tiny face pyramids
+        mtcnn = MTCNN(keep_all=True, min_face_size=60, device='cpu')
         resnet = InceptionResnetV1(pretrained='vggface2').eval().to('cpu')
         models_ready = True
         logger.info("PyTorch FaceNet models loaded successfully.")
@@ -66,11 +67,16 @@ async def extract_embeddings(file: UploadFile = File(...)):
         contents = await file.read()
         image = Image.open(io.BytesIO(contents)).convert('RGB')
         
-        # detect() returns bounding boxes
-        boxes, _ = mtcnn.detect(image)
-        faces = mtcnn(image)
+        # detect() returns bounding boxes (Runs CNN)
+        boxes, probs = mtcnn.detect(image)
         
-        if faces is None or boxes is None or len(faces) == 0:
+        if boxes is None or len(boxes) == 0:
+            return {"success": True, "faceCount": 0, "faces": []}
+            
+        # extract() crops the image using the boxes (NO CNN, instant)
+        faces = mtcnn.extract(image, boxes, save_path=None)
+        
+        if faces is None or len(faces) == 0:
             return {"success": True, "faceCount": 0, "faces": []}
             
         with torch.no_grad():
